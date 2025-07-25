@@ -40,23 +40,32 @@ def health():
 @app.route('/compress', methods=['POST'])
 def compress_png():
     try:
+        # Get analysis parameter first for logging
+        analysis = request.form.get('analysis', 'false').lower() == 'true'
+        request_type = "ANALYSIS" if analysis else "COMPRESSION"
+        
+        # Log the request type clearly
+        print(f"=== {request_type} REQUEST STARTED ===")
+        print(f"Request Type: {request_type}")
+        print(f"Analysis Parameter: {analysis}")
+        
         # Check if file was uploaded
         if 'file' not in request.files:
+            print(f"=== {request_type} REQUEST FAILED: No file provided ===")
             return jsonify({'error': 'No file provided'}), 400
         
         file = request.files['file']
         if file.filename == '':
+            print(f"=== {request_type} REQUEST FAILED: No file selected ===")
             return jsonify({'error': 'No file selected'}), 400
         
         # Check if file is PNG
         if not file.filename.lower().endswith('.png'):
+            print(f"=== {request_type} REQUEST FAILED: Not a PNG file ===")
             return jsonify({'error': 'Only PNG files are supported'}), 400
         
         # Get compression mode (default to lossless)
         mode = request.form.get('mode', 'lossless')
-        
-        # Get analysis parameter (default to false for actual compression)
-        analysis = request.form.get('analysis', 'false').lower() == 'true'
         
         # Get original file size
         file.seek(0, 2)  # Seek to end
@@ -210,6 +219,11 @@ def compress_png():
         print(f"Request type: {request_type}")
         
         if analysis:
+            print(f"=== {request_type} REQUEST COMPLETED: Returning JSON data ===")
+        else:
+            print(f"=== {request_type} REQUEST COMPLETED: Returning compressed file ===")
+        
+        if analysis:
             # Analysis mode: Return JSON with compression data for comparison
             # Convert bytes to human readable format
             def format_size(size_bytes):
@@ -246,7 +260,7 @@ def compress_png():
             )
         
     except Exception as e:
-        print(f"Compression error: {e}")
+        print(f"=== {request_type} REQUEST FAILED: {e} ===")
         return jsonify({
             'error': 'Compression failed',
             'details': str(e)
