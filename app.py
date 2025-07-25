@@ -57,32 +57,68 @@ def compress_png():
         # Get compression method from request (default to oxipng)
         method = request.form.get('method', 'oxipng')
         
-        if method == 'oxipng':
-            # Use oxipng for compression
-            result = subprocess.run([
-                'oxipng', 
-                '--opt', 'max',  # Maximum optimization
-                '--strip', 'safe',  # Strip metadata
-                '--out', output_path,
-                input_path
-            ], capture_output=True, text=True)
-        elif method == 'pngquant':
-            # Use pngquant for compression
-            result = subprocess.run([
-                'pngquant',
-                '--quality=65-80',  # Quality range
-                '--strip',  # Strip metadata
-                '--force',
-                '--output', output_path,
-                input_path
-            ], capture_output=True, text=True)
-        else:
-            return jsonify({'error': 'Invalid compression method. Use "oxipng" or "pngquant"'}), 400
+        print(f"Starting compression with method: {method}")
+        print(f"Input file: {input_path}")
+        print(f"Output file: {output_path}")
+        
+        # Check if compression tools are available
+        try:
+            if method == 'oxipng':
+                # Check if oxipng is available
+                check_result = subprocess.run(['oxipng', '--version'], capture_output=True, text=True)
+                print(f"oxipng version check: {check_result.returncode}")
+                print(f"oxipng stdout: {check_result.stdout}")
+                print(f"oxipng stderr: {check_result.stderr}")
+                
+                # Use oxipng for compression
+                result = subprocess.run([
+                    'oxipng', 
+                    '--opt', 'max',  # Maximum optimization
+                    '--strip', 'safe',  # Strip metadata
+                    '--out', output_path,
+                    input_path
+                ], capture_output=True, text=True)
+            elif method == 'pngquant':
+                # Check if pngquant is available
+                check_result = subprocess.run(['pngquant', '--version'], capture_output=True, text=True)
+                print(f"pngquant version check: {check_result.returncode}")
+                print(f"pngquant stdout: {check_result.stdout}")
+                print(f"pngquant stderr: {check_result.stderr}")
+                
+                # Use pngquant for compression
+                result = subprocess.run([
+                    'pngquant',
+                    '--quality=65-80',  # Quality range
+                    '--strip',  # Strip metadata
+                    '--force',
+                    '--output', output_path,
+                    input_path
+                ], capture_output=True, text=True)
+            else:
+                return jsonify({'error': 'Invalid compression method. Use "oxipng" or "pngquant"'}), 400
+        except FileNotFoundError as e:
+            print(f"Compression tool not found: {e}")
+            return jsonify({
+                'error': 'Compression tool not found',
+                'details': str(e),
+                'method': method
+            }), 500
+        except Exception as e:
+            print(f"Unexpected error during compression: {e}")
+            return jsonify({
+                'error': 'Unexpected compression error',
+                'details': str(e)
+            }), 500
         
         if result.returncode != 0:
+            print(f"Compression failed with return code: {result.returncode}")
+            print(f"stdout: {result.stdout}")
+            print(f"stderr: {result.stderr}")
             return jsonify({
                 'error': 'Compression failed',
-                'details': result.stderr
+                'details': result.stderr,
+                'return_code': result.returncode,
+                'stdout': result.stdout
             }), 500
         
         # Get file sizes for comparison
