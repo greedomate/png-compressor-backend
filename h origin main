@@ -1,0 +1,3 @@
+[33mdf5fa0d[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m Simplify lossy mode to use floyd-steinberg dithering by default
+[33ma866512[m Remove confusing quality parameter from lossless mode
+[33m11b9f9e[m Fix dithering attribute mapping for lossy compression
