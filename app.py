@@ -105,12 +105,28 @@ def compress_png():
                 if image.mode == 'LA':
                     image = image.convert('RGBA')
                 # Convert to palette with transparency support
-                image = image.quantize(colors=colors, dither=getattr(Image, f'Dither.{dither.upper()}' if dither != 'none' else 'Dither.NONE'))
+                if dither == 'none':
+                    dither_attr = Image.Dither.NONE
+                elif dither == 'floyd-steinberg':
+                    dither_attr = Image.Dither.FLOYDSTEINBERG
+                elif dither == 'ordered':
+                    dither_attr = Image.Dither.ORDERED
+                else:
+                    dither_attr = Image.Dither.FLOYDSTEINBERG
+                image = image.quantize(colors=colors, dither=dither_attr)
             else:
                 # Convert to RGB first, then to palette
                 if image.mode != 'RGB':
                     image = image.convert('RGB')
-                image = image.quantize(colors=colors, dither=getattr(Image, f'Dither.{dither.upper()}' if dither != 'none' else 'Dither.NONE'))
+                if dither == 'none':
+                    dither_attr = Image.Dither.NONE
+                elif dither == 'floyd-steinberg':
+                    dither_attr = Image.Dither.FLOYDSTEINBERG
+                elif dither == 'ordered':
+                    dither_attr = Image.Dither.ORDERED
+                else:
+                    dither_attr = Image.Dither.FLOYDSTEINBERG
+                image = image.quantize(colors=colors, dither=dither_attr)
             
             # Save as PNG
             image.save(
