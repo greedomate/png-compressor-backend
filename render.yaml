@@ -3,7 +3,18 @@ services:
     name: png-compressor-backend
     env: python
     plan: free
-    buildCommand: pip install -r requirements.txt
+    buildCommand: |
+      pip install -r requirements.txt
+      # Install oxipng
+      curl -L https://github.com/shssoichiro/oxipng/releases/download/v9.1.5/oxipng-9.1.5-x86_64-unknown-linux-gnu.tar.gz -o oxipng.tar.gz
+      tar -xzf oxipng.tar.gz
+      mv oxipng /usr/local/bin/
+      chmod +x /usr/local/bin/oxipng
+      # Install pngquant
+      curl -L https://pngquant.org/pngquant-2.17.0-linux.tar.gz -o pngquant.tar.gz
+      tar -xzf pngquant.tar.gz
+      mv pngquant/pngquant /usr/local/bin/
+      chmod +x /usr/local/bin/pngquant
     startCommand: python app.py
     envVars:
       - key: PYTHON_VERSION
