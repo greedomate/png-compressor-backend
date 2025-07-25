@@ -29,6 +29,31 @@ def home():
 def health():
     return jsonify({'status': 'healthy'})
 
+@app.route('/test-tools')
+def test_tools():
+    """Test if compression tools are available"""
+    try:
+        # Test oxipng
+        oxipng_result = subprocess.run(['oxipng', '--version'], capture_output=True, text=True)
+        
+        # Test pngquant
+        pngquant_result = subprocess.run(['pngquant', '--version'], capture_output=True, text=True)
+        
+        return jsonify({
+            'oxipng': {
+                'available': oxipng_result.returncode == 0,
+                'version': oxipng_result.stdout.strip() if oxipng_result.returncode == 0 else 'Not found',
+                'error': oxipng_result.stderr if oxipng_result.returncode != 0 else None
+            },
+            'pngquant': {
+                'available': pngquant_result.returncode == 0,
+                'version': pngquant_result.stdout.strip() if pngquant_result.returncode == 0 else 'Not found',
+                'error': pngquant_result.stderr if pngquant_result.returncode != 0 else None
+            }
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/compress', methods=['POST'])
 def compress_png():
     try:
