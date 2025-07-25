@@ -89,10 +89,8 @@ def compress_png():
             colors = int(request.form.get('colors', 256))
             colors = max(2, min(256, colors))  # Ensure colors is between 2-256
             
-            dither = request.form.get('dither', 'floyd-steinberg')
-            valid_dithers = ['none', 'floyd-steinberg', 'ordered']
-            if dither not in valid_dithers:
-                dither = 'floyd-steinberg'
+            # Use floyd-steinberg as default (best quality for most images)
+            dither = 'floyd-steinberg'
             
             print(f"Lossy mode - colors: {colors}, dither: {dither}")
             
