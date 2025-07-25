@@ -3,17 +3,7 @@ services:
     name: png-compressor-backend
     env: python
     plan: free
-    buildCommand: |
-      pip install -r requirements.txt
-      # Update package list and install dependencies
-      apt-get update
-      # Install oxipng and pngquant using apt
-      apt-get install -y oxipng pngquant
-      # Verify installation
-      which oxipng
-      which pngquant
-      oxipng --version
-      pngquant --version
+    buildCommand: pip install -r requirements.txt
     startCommand: python app.py
     envVars:
       - key: PYTHON_VERSION
