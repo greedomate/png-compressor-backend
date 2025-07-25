@@ -64,13 +64,10 @@ def compress_png():
         
         if mode == 'lossless':
             # Lossless compression - preserve all colors
-            quality = int(request.form.get('quality', 85))
-            quality = max(1, min(100, quality))
-            
             optimize = int(request.form.get('optimize', 6))
             optimize = max(0, min(9, optimize))
             
-            print(f"Lossless mode - quality: {quality}, optimize: {optimize}")
+            print(f"Lossless mode - optimize: {optimize}")
             
             # Convert to RGB if necessary (PNG with transparency will be preserved)
             if image.mode in ('RGBA', 'LA', 'P'):
