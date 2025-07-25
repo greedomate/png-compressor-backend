@@ -4,8 +4,13 @@ import tempfile
 from werkzeug.utils import secure_filename
 from PIL import Image
 import io
+import logging
 
 app = Flask(__name__)
+
+# Configure logging to show in Render
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Configure upload folder
 UPLOAD_FOLDER = 'uploads'
@@ -45,23 +50,23 @@ def compress_png():
         request_type = "ANALYSIS" if analysis else "COMPRESSION"
         
         # Log the request type clearly
-        print(f"=== {request_type} REQUEST STARTED ===")
-        print(f"Request Type: {request_type}")
-        print(f"Analysis Parameter: {analysis}")
+        logger.info(f"=== {request_type} REQUEST STARTED ===")
+        logger.info(f"Request Type: {request_type}")
+        logger.info(f"Analysis Parameter: {analysis}")
         
         # Check if file was uploaded
         if 'file' not in request.files:
-            print(f"=== {request_type} REQUEST FAILED: No file provided ===")
+            logger.error(f"=== {request_type} REQUEST FAILED: No file provided ===")
             return jsonify({'error': 'No file provided'}), 400
         
         file = request.files['file']
         if file.filename == '':
-            print(f"=== {request_type} REQUEST FAILED: No file selected ===")
+            logger.error(f"=== {request_type} REQUEST FAILED: No file selected ===")
             return jsonify({'error': 'No file selected'}), 400
         
         # Check if file is PNG
         if not file.filename.lower().endswith('.png'):
-            print(f"=== {request_type} REQUEST FAILED: Not a PNG file ===")
+            logger.error(f"=== {request_type} REQUEST FAILED: Not a PNG file ===")
             return jsonify({'error': 'Only PNG files are supported'}), 400
         
         # Get compression mode (default to lossless)
@@ -73,12 +78,12 @@ def compress_png():
         file.seek(0)  # Reset to beginning
         
         request_type = "analysis" if analysis else "compression"
-        print(f"Starting {mode} {request_type}")
-        print(f"Original file size: {original_size} bytes")
+        logger.info(f"Starting {mode} {request_type}")
+        logger.info(f"Original file size: {original_size} bytes")
         
         if analysis:
             # Analysis mode: Quick compression test for size estimation
-            print(f"Running quick analysis for {mode} mode")
+            logger.info(f"Running quick analysis for {mode} mode")
             
             # For analysis, we can use faster settings
             if mode == 'lossless':
@@ -126,7 +131,7 @@ def compress_png():
                 
         else:
             # Compression mode: Full processing for actual compression
-            print(f"Running full compression for {mode} mode")
+            logger.info(f"Running full compression for {mode} mode")
             
             # Open the uploaded image
             image = Image.open(file.stream)
@@ -139,7 +144,7 @@ def compress_png():
                 optimize = int(request.form.get('optimize', 6))
                 optimize = max(0, min(9, optimize))
                 
-                print(f"Lossless mode - optimize: {optimize}")
+                logger.info(f"Lossless mode - optimize: {optimize}")
                 
                 # Convert to RGB if necessary (PNG with transparency will be preserved)
                 if image.mode in ('RGBA', 'LA', 'P'):
@@ -164,7 +169,7 @@ def compress_png():
                 # Use floyd-steinberg as default (best quality for most images)
                 dither = 'floyd-steinberg'
                 
-                print(f"Lossy mode - colors: {colors}, dither: {dither}")
+                logger.info(f"Lossy mode - colors: {colors}, dither: {dither}")
                 
                 # Convert to palette mode with specified number of colors
                 if image.mode in ('RGBA', 'LA'):
@@ -213,15 +218,15 @@ def compress_png():
         compressed_size = len(compressed_data)
         compression_ratio = ((original_size - compressed_size) / original_size) * 100
         
-        print(f"Compressed size: {compressed_size} bytes")
-        print(f"Compression ratio: {compression_ratio:.2f}%")
-        print(f"Mode: {mode}")
-        print(f"Request type: {request_type}")
+        logger.info(f"Compressed size: {compressed_size} bytes")
+        logger.info(f"Compression ratio: {compression_ratio:.2f}%")
+        logger.info(f"Mode: {mode}")
+        logger.info(f"Request type: {request_type}")
         
         if analysis:
-            print(f"=== {request_type} REQUEST COMPLETED: Returning JSON data ===")
+            logger.info(f"=== {request_type} REQUEST COMPLETED: Returning JSON data ===")
         else:
-            print(f"=== {request_type} REQUEST COMPLETED: Returning compressed file ===")
+            logger.info(f"=== {request_type} REQUEST COMPLETED: Returning compressed file ===")
         
         if analysis:
             # Analysis mode: Return JSON with compression data for comparison
@@ -260,7 +265,7 @@ def compress_png():
             )
         
     except Exception as e:
-        print(f"=== {request_type} REQUEST FAILED: {e} ===")
+        logger.error(f"=== {request_type} REQUEST FAILED: {e} ===")
         return jsonify({
             'error': 'Compression failed',
             'details': str(e)
