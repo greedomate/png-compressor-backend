@@ -31,9 +31,8 @@ def home():
         },
         'compress_parameters': {
             'file': 'PNG file to compress (required)',
-            'mode': 'Compression mode: "lossless" or "lossy" (default: "lossless")',
+            'mode': 'Compression mode: "lossy" (default: "lossy")',
             'analysis': 'Analysis mode: "true" for testing, "false" for actual compression (default: "false")',
-            'optimize': 'Optimization level 0-9 for lossless mode (default: 6)',
             'colors': 'Number of colors 2-256 for lossy mode (default: 256)'
         }
     })
@@ -69,8 +68,8 @@ def compress_png():
             logger.error(f"=== {request_type} REQUEST FAILED: Not a PNG file ===")
             return jsonify({'error': 'Only PNG files are supported'}), 400
         
-        # Get compression mode (default to lossless)
-        mode = request.form.get('mode', 'lossless')
+        # Get compression mode (default to lossy)
+        mode = request.form.get('mode', 'lossy')
         
         # Get original file size
         file.seek(0, 2)  # Seek to end
@@ -86,27 +85,7 @@ def compress_png():
             logger.info(f"Running quick analysis for {mode} mode")
             
             # For analysis, we can use faster settings
-            if mode == 'lossless':
-                # Use lower optimization for faster analysis
-                optimize = int(request.form.get('optimize', 6))
-                optimize = max(0, min(9, optimize))
-                
-                # Quick lossless test - just get the size
-                output_buffer = io.BytesIO()
-                image = Image.open(file.stream)
-                
-                # Minimal processing for analysis
-                if image.mode not in ('RGBA', 'LA', 'P', 'RGB'):
-                    image = image.convert('RGB')
-                
-                image.save(
-                    output_buffer,
-                    format='PNG',
-                    optimize=True,
-                    compress_level=min(optimize, 6)  # Cap at 6 for faster analysis
-                )
-                
-            elif mode == 'lossy':
+            if mode == 'lossy':
                 # Quick lossy test with reduced colors for faster analysis
                 colors = int(request.form.get('colors', 256))
                 colors = max(2, min(256, colors))
@@ -127,7 +106,7 @@ def compress_png():
                 image.save(output_buffer, format='PNG', optimize=True)
                 
             else:
-                return jsonify({'error': 'Invalid mode. Use "lossless" or "lossy"'}), 400
+                return jsonify({'error': 'Invalid mode. Use "lossy"'}), 400
                 
         else:
             # Compression mode: Full processing for actual compression
@@ -139,29 +118,7 @@ def compress_png():
             # Create output buffer
             output_buffer = io.BytesIO()
             
-            if mode == 'lossless':
-                # Lossless compression - preserve all colors
-                optimize = int(request.form.get('optimize', 6))
-                optimize = max(0, min(9, optimize))
-                
-                logger.info(f"Lossless mode - optimize: {optimize}")
-                
-                # Convert to RGB if necessary (PNG with transparency will be preserved)
-                if image.mode in ('RGBA', 'LA', 'P'):
-                    # Keep transparency for PNG
-                    pass
-                elif image.mode != 'RGB':
-                    image = image.convert('RGB')
-                
-                # Save with compression settings
-                image.save(
-                    output_buffer,
-                    format='PNG',
-                    optimize=True,
-                    compress_level=optimize
-                )
-                
-            elif mode == 'lossy':
+            if mode == 'lossy':
                 # Lossy compression - reduce colors
                 colors = int(request.form.get('colors', 256))
                 colors = max(2, min(256, colors))  # Ensure colors is between 2-256
@@ -208,7 +165,7 @@ def compress_png():
                 )
                 
             else:
-                return jsonify({'error': 'Invalid mode. Use "lossless" or "lossy"'}), 400
+                return jsonify({'error': 'Invalid mode. Use "lossy"'}), 400
         
         # Get the compressed data
         output_buffer.seek(0)
