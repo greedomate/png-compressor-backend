@@ -27,6 +27,7 @@ def home():
         'status': 'running',
         'endpoints': {
             'compress': '/compress',
+            'analyze_png_batch': '/analyze-png-batch',
             'health': '/health'
         },
         'compress_parameters': {
@@ -34,6 +35,10 @@ def home():
             'mode': 'Compression mode: "lossy" (default: "lossy")',
             'analysis': 'Analysis mode: "true" for testing, "false" for actual compression (default: "false")',
             'colors': 'Number of colors 2-256 for lossy mode (default: 256)'
+        },
+        'batch_analysis_parameters': {
+            'image': 'PNG file to analyze (required)',
+            'color_counts': 'Comma-separated color counts to test (e.g., "32,64,128")'
         }
     })
 
@@ -111,61 +116,61 @@ def compress_png():
         else:
             # Compression mode: Full processing for actual compression
             logger.info(f"Running full compression for {mode} mode")
+        
+        # Open the uploaded image
+        image = Image.open(file.stream)
+        
+        # Create output buffer
+        output_buffer = io.BytesIO()
+        
+        if mode == 'lossy':
+            # Lossy compression - reduce colors
+            colors = int(request.form.get('colors', 256))
+            colors = max(2, min(256, colors))  # Ensure colors is between 2-256
             
-            # Open the uploaded image
-            image = Image.open(file.stream)
+            # Use floyd-steinberg as default (best quality for most images)
+            dither = 'floyd-steinberg'
             
-            # Create output buffer
-            output_buffer = io.BytesIO()
+            logger.info(f"Lossy mode - colors: {colors}, dither: {dither}")
             
-            if mode == 'lossy':
-                # Lossy compression - reduce colors
-                colors = int(request.form.get('colors', 256))
-                colors = max(2, min(256, colors))  # Ensure colors is between 2-256
-                
-                # Use floyd-steinberg as default (best quality for most images)
-                dither = 'floyd-steinberg'
-                
-                logger.info(f"Lossy mode - colors: {colors}, dither: {dither}")
-                
-                # Convert to palette mode with specified number of colors
-                if image.mode in ('RGBA', 'LA'):
-                    # Handle transparency by converting to RGBA first
-                    if image.mode == 'LA':
-                        image = image.convert('RGBA')
-                    # Convert to palette with transparency support
-                    if dither == 'none':
-                        dither_attr = Image.Dither.NONE
-                    elif dither == 'floyd-steinberg':
-                        dither_attr = Image.Dither.FLOYDSTEINBERG
-                    elif dither == 'ordered':
-                        dither_attr = Image.Dither.ORDERED
-                    else:
-                        dither_attr = Image.Dither.FLOYDSTEINBERG
-                    image = image.quantize(colors=colors, dither=dither_attr)
+            # Convert to palette mode with specified number of colors
+            if image.mode in ('RGBA', 'LA'):
+                # Handle transparency by converting to RGBA first
+                if image.mode == 'LA':
+                    image = image.convert('RGBA')
+                # Convert to palette with transparency support
+                if dither == 'none':
+                    dither_attr = Image.Dither.NONE
+                elif dither == 'floyd-steinberg':
+                    dither_attr = Image.Dither.FLOYDSTEINBERG
+                elif dither == 'ordered':
+                    dither_attr = Image.Dither.ORDERED
                 else:
-                    # Convert to RGB first, then to palette
-                    if image.mode != 'RGB':
-                        image = image.convert('RGB')
-                    if dither == 'none':
-                        dither_attr = Image.Dither.NONE
-                    elif dither == 'floyd-steinberg':
-                        dither_attr = Image.Dither.FLOYDSTEINBERG
-                    elif dither == 'ordered':
-                        dither_attr = Image.Dither.ORDERED
-                    else:
-                        dither_attr = Image.Dither.FLOYDSTEINBERG
-                    image = image.quantize(colors=colors, dither=dither_attr)
-                
-                # Save as PNG
-                image.save(
-                    output_buffer,
-                    format='PNG',
-                    optimize=True
-                )
-                
+                    dither_attr = Image.Dither.FLOYDSTEINBERG
+                image = image.quantize(colors=colors, dither=dither_attr)
             else:
-                return jsonify({'error': 'Invalid mode. Use "lossy"'}), 400
+                # Convert to RGB first, then to palette
+                if image.mode != 'RGB':
+                    image = image.convert('RGB')
+                if dither == 'none':
+                    dither_attr = Image.Dither.NONE
+                elif dither == 'floyd-steinberg':
+                    dither_attr = Image.Dither.FLOYDSTEINBERG
+                elif dither == 'ordered':
+                    dither_attr = Image.Dither.ORDERED
+                else:
+                    dither_attr = Image.Dither.FLOYDSTEINBERG
+                image = image.quantize(colors=colors, dither=dither_attr)
+            
+            # Save as PNG
+            image.save(
+                output_buffer,
+                format='PNG',
+                optimize=True
+            )
+            
+        else:
+            return jsonify({'error': 'Invalid mode. Use "lossy"'}), 400
         
         # Get the compressed data
         output_buffer.seek(0)
@@ -225,6 +230,124 @@ def compress_png():
         logger.error(f"=== {request_type} REQUEST FAILED: {e} ===")
         return jsonify({
             'error': 'Compression failed',
+            'details': str(e)
+        }), 500
+
+@app.route('/analyze-png-batch', methods=['POST'])
+def analyze_png_batch():
+    """
+    Batch analysis endpoint for smart analysis
+    Tests multiple color counts in a single request for faster analysis
+    """
+    try:
+        logger.info("=== BATCH ANALYSIS REQUEST STARTED ===")
+        
+        # Check if file was uploaded
+        if 'image' not in request.files:
+            logger.error("=== BATCH ANALYSIS REQUEST FAILED: No image provided ===")
+            return jsonify({'error': 'No image provided'}), 400
+        
+        file = request.files['image']
+        if file.filename == '':
+            logger.error("=== BATCH ANALYSIS REQUEST FAILED: No image selected ===")
+            return jsonify({'error': 'No image selected'}), 400
+        
+        # Check if file is PNG
+        if not file.filename.lower().endswith('.png'):
+            logger.error("=== BATCH ANALYSIS REQUEST FAILED: Not a PNG file ===")
+            return jsonify({'error': 'Only PNG files are supported'}), 400
+        
+        # Get color counts array
+        color_counts_str = request.form.get('color_counts', '')
+        if not color_counts_str:
+            logger.error("=== BATCH ANALYSIS REQUEST FAILED: No color_counts provided ===")
+            return jsonify({'error': 'color_counts parameter is required'}), 400
+        
+        try:
+            color_counts = [int(x.strip()) for x in color_counts_str.split(',')]
+            # Validate color counts
+            for count in color_counts:
+                if count < 2 or count > 256:
+                    logger.error(f"=== BATCH ANALYSIS REQUEST FAILED: Invalid color count {count} ===")
+                    return jsonify({'error': f'Color count {count} must be between 2 and 256'}), 400
+        except ValueError:
+            logger.error("=== BATCH ANALYSIS REQUEST FAILED: Invalid color_counts format ===")
+            return jsonify({'error': 'color_counts must be comma-separated integers'}), 400
+        
+        # Get original file size
+        file.seek(0, 2)  # Seek to end
+        original_size = file.tell()
+        file.seek(0)  # Reset to beginning
+        
+        logger.info(f"Batch analysis for {len(color_counts)} color counts: {color_counts}")
+        logger.info(f"Original file size: {original_size} bytes")
+        
+        # Open the image once
+        image = Image.open(file.stream)
+        results = []
+        
+        # Convert bytes to human readable format
+        def format_size(size_bytes):
+            if size_bytes < 1024:
+                return f"{size_bytes}B"
+            elif size_bytes < 1024 * 1024:
+                return f"{size_bytes / 1024:.1f}KB"
+            else:
+                return f"{size_bytes / (1024 * 1024):.1f}MB"
+        
+        # Test each color count
+        for color_count in color_counts:
+            logger.info(f"Testing {color_count} colors...")
+            
+            # Create a copy of the image for this test
+            test_image = image.copy()
+            
+            # Create output buffer
+            output_buffer = io.BytesIO()
+            
+            # Apply lossy compression with this color count
+            if test_image.mode in ('RGBA', 'LA'):
+                if test_image.mode == 'LA':
+                    test_image = test_image.convert('RGBA')
+                test_image = test_image.quantize(colors=color_count, dither=Image.Dither.FLOYDSTEINBERG)
+            else:
+                if test_image.mode != 'RGB':
+                    test_image = test_image.convert('RGB')
+                test_image = test_image.quantize(colors=color_count, dither=Image.Dither.FLOYDSTEINBERG)
+            
+            # Save as PNG
+            test_image.save(output_buffer, format='PNG', optimize=True)
+            
+            # Get compressed size
+            output_buffer.seek(0)
+            compressed_data = output_buffer.getvalue()
+            compressed_size = len(compressed_data)
+            compression_ratio = ((original_size - compressed_size) / original_size) * 100
+            
+            # Add result
+            results.append({
+                'color_count': color_count,
+                'compressed_size': compressed_size,
+                'compressed_size_formatted': format_size(compressed_size),
+                'compression_ratio': round(compression_ratio, 2)
+            })
+            
+            logger.info(f"  {color_count} colors: {format_size(compressed_size)} ({compression_ratio:.1f}% reduction)")
+        
+        logger.info("=== BATCH ANALYSIS REQUEST COMPLETED ===")
+        
+        return jsonify({
+            'batch_analysis': True,
+            'original_size': original_size,
+            'original_size_formatted': format_size(original_size),
+            'results': results,
+            'message': 'Batch analysis completed - use results for smart recommendations'
+        })
+        
+    except Exception as e:
+        logger.error(f"=== BATCH ANALYSIS REQUEST FAILED: {e} ===")
+        return jsonify({
+            'error': 'Batch analysis failed',
             'details': str(e)
         }), 500
 
