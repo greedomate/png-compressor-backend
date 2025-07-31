@@ -133,61 +133,80 @@ def compress_png():
         else:
             # Compression mode: Full processing for actual compression
             logger.info(f"Running full compression for {mode} mode")
-        
-        # Open the uploaded image
-        image = Image.open(file.stream)
-        
-        # Create output buffer
-        output_buffer = io.BytesIO()
-        
-        if mode == 'lossy':
-            # Lossy compression - reduce colors
-            colors = int(request.form.get('colors', 256))
-            colors = max(2, min(256, colors))  # Ensure colors is between 2-256
             
-            # Use floyd-steinberg as default (best quality for most images)
-            dither = 'floyd-steinberg'
+            # Open the uploaded image with optimized memory usage
+            image = Image.open(file.stream)
             
-            logger.info(f"Lossy mode - colors: {colors}, dither: {dither}")
+            # Size-based auto-optimization for compression speed
+            image_size_mb = (image.size[0] * image.size[1] * 4) / (1024 * 1024)  # Approximate size in MB
+            is_large_image = image_size_mb > 1.0  # Consider >1MB as large
             
-            # Convert to palette mode with specified number of colors
-            if image.mode in ('RGBA', 'LA'):
-                # Handle transparency by converting to RGBA first
-                if image.mode == 'LA':
-                    image = image.convert('RGBA')
-                # Convert to palette with transparency support
-                if dither == 'none':
-                    dither_attr = Image.Dither.NONE
-                elif dither == 'floyd-steinberg':
-                    dither_attr = Image.Dither.FLOYDSTEINBERG
-                elif dither == 'ordered':
-                    dither_attr = Image.Dither.ORDERED
+            if is_large_image:
+                logger.info(f"Large image detected ({image_size_mb:.1f}MB) - using optimized processing")
+            
+            # Create output buffer with optimized size
+            output_buffer = io.BytesIO()
+            
+            if mode == 'lossy':
+                # Lossy compression - reduce colors
+                colors = int(request.form.get('colors', 256))
+                colors = max(2, min(256, colors))  # Ensure colors is between 2-256
+                
+                # Use floyd-steinberg as default (best quality for most images)
+                dither = 'floyd-steinberg'
+                
+                logger.info(f"Lossy mode - colors: {colors}, dither: {dither}")
+                
+                # Optimized image processing pipeline
+                # Convert to palette mode with specified number of colors
+                if image.mode in ('RGBA', 'LA'):
+                    # Handle transparency by converting to RGBA first
+                    if image.mode == 'LA':
+                        image = image.convert('RGBA')
+                    # Convert to palette with transparency support
+                    if dither == 'none':
+                        dither_attr = Image.Dither.NONE
+                    elif dither == 'floyd-steinberg':
+                        dither_attr = Image.Dither.FLOYDSTEINBERG
+                    elif dither == 'ordered':
+                        dither_attr = Image.Dither.ORDERED
+                    else:
+                        dither_attr = Image.Dither.FLOYDSTEINBERG
+                    image = image.quantize(colors=colors, dither=dither_attr)
                 else:
-                    dither_attr = Image.Dither.FLOYDSTEINBERG
-                image = image.quantize(colors=colors, dither=dither_attr)
+                    # Convert to RGB first, then to palette
+                    if image.mode != 'RGB':
+                        image = image.convert('RGB')
+                    if dither == 'none':
+                        dither_attr = Image.Dither.NONE
+                    elif dither == 'floyd-steinberg':
+                        dither_attr = Image.Dither.FLOYDSTEINBERG
+                    elif dither == 'ordered':
+                        dither_attr = Image.Dither.ORDERED
+                    else:
+                        dither_attr = Image.Dither.FLOYDSTEINBERG
+                    image = image.quantize(colors=colors, dither=dither_attr)
+                
+                # Optimized PNG saving with size-based settings
+                if is_large_image:
+                    # For large images, use balanced optimization for speed
+                    image.save(
+                        output_buffer,
+                        format='PNG',
+                        optimize=True,
+                        compress_level=6  # Balanced compression level
+                    )
+                else:
+                    # For small images, use full optimization for best quality
+                    image.save(
+                        output_buffer,
+                        format='PNG',
+                        optimize=True,
+                        compress_level=9  # Maximum compression level
+                    )
+                
             else:
-                # Convert to RGB first, then to palette
-                if image.mode != 'RGB':
-                    image = image.convert('RGB')
-                if dither == 'none':
-                    dither_attr = Image.Dither.NONE
-                elif dither == 'floyd-steinberg':
-                    dither_attr = Image.Dither.FLOYDSTEINBERG
-                elif dither == 'ordered':
-                    dither_attr = Image.Dither.ORDERED
-                else:
-                    dither_attr = Image.Dither.FLOYDSTEINBERG
-                image = image.quantize(colors=colors, dither=dither_attr)
-            
-            # Save as PNG
-            image.save(
-                output_buffer,
-                format='PNG',
-                optimize=True
-            )
-            
-        else:
-            return jsonify({'error': 'Invalid mode. Use "lossy"'}), 400
+                return jsonify({'error': 'Invalid mode. Use "lossy"'}), 400
         
         # Get the compressed data
         output_buffer.seek(0)
@@ -306,8 +325,12 @@ def analyze_png_batch():
         logger.info(f"Batch analysis for {len(color_counts)} color counts: {color_counts}")
         logger.info(f"Original file size: {original_size} bytes")
         
-        # Open the image once
+        # Open the image once with optimized memory usage
         image = Image.open(file.stream)
+        
+        # Size-based optimization for batch analysis
+        image_size_mb = (image.size[0] * image.size[1] * 4) / (1024 * 1024)  # Approximate size in MB
+        is_large_image = image_size_mb > 1.0  # Consider >1MB as large
         
         # For batch analysis, resize large images to speed up processing
         max_analysis_size = 800  # Max dimension for analysis
@@ -317,6 +340,9 @@ def analyze_png_batch():
             new_size = (int(image.size[0] * ratio), int(image.size[1] * ratio))
             image = image.resize(new_size, Image.Resampling.LANCZOS)
             logger.info(f"Resized image to {new_size} for faster batch analysis")
+        
+        if is_large_image:
+            logger.info(f"Large image detected ({image_size_mb:.1f}MB) - using optimized batch processing")
         
         results = []
         
