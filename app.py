@@ -189,20 +189,20 @@ def compress_png():
                 
                 # Optimized PNG saving with size-based settings
                 if is_large_image:
-                    # For large images, use balanced optimization for speed
+                    # For large images, use no compression for maximum speed
                     image.save(
                         output_buffer,
                         format='PNG',
-                        optimize=True,
-                        compress_level=6  # Balanced compression level
+                        optimize=False,
+                        compress_level=0  # No compression for maximum speed
                     )
                 else:
-                    # For small images, use full optimization for best quality
+                    # For small images, also use no compression for speed
                     image.save(
                         output_buffer,
                         format='PNG',
-                        optimize=True,
-                        compress_level=9  # Maximum compression level
+                        optimize=False,
+                        compress_level=0  # No compression for maximum speed
                     )
                 
             else:
