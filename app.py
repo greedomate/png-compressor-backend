@@ -105,17 +105,27 @@ def compress_png():
                 output_buffer = io.BytesIO()
                 image = Image.open(file.stream)
                 
-                # Simplified lossy processing for analysis
+                # For analysis, resize large images to speed up processing
+                max_analysis_size = 800  # Max dimension for analysis
+                if max(image.size) > max_analysis_size:
+                    # Calculate new size maintaining aspect ratio
+                    ratio = max_analysis_size / max(image.size)
+                    new_size = (int(image.size[0] * ratio), int(image.size[1] * ratio))
+                    image = image.resize(new_size, Image.Resampling.LANCZOS)
+                    logger.info(f"Resized image to {new_size} for faster analysis")
+                
+                # Use faster dithering for analysis
                 if image.mode in ('RGBA', 'LA'):
                     if image.mode == 'LA':
                         image = image.convert('RGBA')
-                    image = image.quantize(colors=colors, dither=Image.Dither.FLOYDSTEINBERG)
+                    image = image.quantize(colors=colors, dither=Image.Dither.ORDERED)  # Faster than FLOYDSTEINBERG
                 else:
                     if image.mode != 'RGB':
                         image = image.convert('RGB')
-                    image = image.quantize(colors=colors, dither=Image.Dither.FLOYDSTEINBERG)
+                    image = image.quantize(colors=colors, dither=Image.Dither.ORDERED)  # Faster than FLOYDSTEINBERG
                 
-                image.save(output_buffer, format='PNG', optimize=True)
+                # Use lower optimization for faster analysis
+                image.save(output_buffer, format='PNG', optimize=False)  # No optimization for speed
                 
             else:
                 return jsonify({'error': 'Invalid mode. Use "lossy"'}), 400
@@ -298,6 +308,16 @@ def analyze_png_batch():
         
         # Open the image once
         image = Image.open(file.stream)
+        
+        # For batch analysis, resize large images to speed up processing
+        max_analysis_size = 800  # Max dimension for analysis
+        if max(image.size) > max_analysis_size:
+            # Calculate new size maintaining aspect ratio
+            ratio = max_analysis_size / max(image.size)
+            new_size = (int(image.size[0] * ratio), int(image.size[1] * ratio))
+            image = image.resize(new_size, Image.Resampling.LANCZOS)
+            logger.info(f"Resized image to {new_size} for faster batch analysis")
+        
         results = []
         
         # Convert bytes to human readable format
@@ -323,14 +343,14 @@ def analyze_png_batch():
             if test_image.mode in ('RGBA', 'LA'):
                 if test_image.mode == 'LA':
                     test_image = test_image.convert('RGBA')
-                test_image = test_image.quantize(colors=color_count, dither=Image.Dither.FLOYDSTEINBERG)
+                test_image = test_image.quantize(colors=color_count, dither=Image.Dither.ORDERED)  # Faster for analysis
             else:
                 if test_image.mode != 'RGB':
                     test_image = test_image.convert('RGB')
-                test_image = test_image.quantize(colors=color_count, dither=Image.Dither.FLOYDSTEINBERG)
+                test_image = test_image.quantize(colors=color_count, dither=Image.Dither.ORDERED)  # Faster for analysis
             
-            # Save as PNG
-            test_image.save(output_buffer, format='PNG', optimize=True)
+            # Save as PNG (no optimization for speed)
+            test_image.save(output_buffer, format='PNG', optimize=False)
             
             # Get compressed size
             output_buffer.seek(0)
