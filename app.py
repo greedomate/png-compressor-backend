@@ -37,7 +37,7 @@ def home():
             'colors': 'Number of colors 2-256 for lossy mode (default: 256)'
         },
         'batch_analysis_parameters': {
-            'image': 'PNG file to analyze (required)',
+            'file': 'PNG file to analyze (required)',
             'color_counts': 'Comma-separated color counts to test (e.g., "32,64,128")'
         }
     })
@@ -68,9 +68,16 @@ def compress_png():
             logger.error(f"=== {request_type} REQUEST FAILED: No file selected ===")
             return jsonify({'error': 'No file selected'}), 400
         
-        # Check if file is PNG
-        if not file.filename.lower().endswith('.png'):
-            logger.error(f"=== {request_type} REQUEST FAILED: Not a PNG file ===")
+        # Check if file is PNG (validate by content, not just extension)
+        def is_png_file(file):
+            # Check file signature (PNG magic bytes)
+            file.seek(0)
+            signature = file.read(8)
+            file.seek(0)  # Reset position
+            return signature.startswith(b'\x89PNG\r\n\x1a\n')
+        
+        if not is_png_file(file):
+            logger.error(f"=== {request_type} REQUEST FAILED: Not a PNG file (invalid content) ===")
             return jsonify({'error': 'Only PNG files are supported'}), 400
         
         # Get compression mode (default to lossy)
@@ -243,18 +250,25 @@ def analyze_png_batch():
         logger.info("=== BATCH ANALYSIS REQUEST STARTED ===")
         
         # Check if file was uploaded
-        if 'image' not in request.files:
-            logger.error("=== BATCH ANALYSIS REQUEST FAILED: No image provided ===")
-            return jsonify({'error': 'No image provided'}), 400
+        if 'file' not in request.files:
+            logger.error("=== BATCH ANALYSIS REQUEST FAILED: No file provided ===")
+            return jsonify({'error': 'No file provided'}), 400
         
-        file = request.files['image']
+        file = request.files['file']
         if file.filename == '':
-            logger.error("=== BATCH ANALYSIS REQUEST FAILED: No image selected ===")
-            return jsonify({'error': 'No image selected'}), 400
+            logger.error("=== BATCH ANALYSIS REQUEST FAILED: No file selected ===")
+            return jsonify({'error': 'No file selected'}), 400
         
-        # Check if file is PNG
-        if not file.filename.lower().endswith('.png'):
-            logger.error("=== BATCH ANALYSIS REQUEST FAILED: Not a PNG file ===")
+        # Check if file is PNG (validate by content, not just extension)
+        def is_png_file(file):
+            # Check file signature (PNG magic bytes)
+            file.seek(0)
+            signature = file.read(8)
+            file.seek(0)  # Reset position
+            return signature.startswith(b'\x89PNG\r\n\x1a\n')
+        
+        if not is_png_file(file):
+            logger.error("=== BATCH ANALYSIS REQUEST FAILED: Not a PNG file (invalid content) ===")
             return jsonify({'error': 'Only PNG files are supported'}), 400
         
         # Get color counts array
