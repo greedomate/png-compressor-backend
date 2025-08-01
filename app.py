@@ -221,18 +221,18 @@ def compress_png():
             })
         else:
             # Compression mode: Return the actual compressed file
-        # Create output filename
-        name, ext = os.path.splitext(secure_filename(file.filename))
-        output_filename = f"{name}_{mode}_compressed{ext}"
-        
-        # Return compressed file
-        output_buffer.seek(0)
-        return send_file(
-            output_buffer,
-            as_attachment=True,
-            download_name=output_filename,
-            mimetype='image/png'
-        )
+            # Create output filename
+            name, ext = os.path.splitext(secure_filename(file.filename))
+            output_filename = f"{name}_{mode}_compressed{ext}"
+            
+            # Return compressed file
+            output_buffer.seek(0)
+            return send_file(
+                output_buffer,
+                as_attachment=True,
+                download_name=output_filename,
+                mimetype='image/png'
+            )
         
     except Exception as e:
         logger.error(f"=== {request_type} REQUEST FAILED: {e} ===")
